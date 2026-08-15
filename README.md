@@ -63,6 +63,14 @@ node nle-semantic/server.mjs --spool <工作区>/.nle-semantic
 - 离线环境:预先在有网机器跑一次 `node nle-semantic/server.mjs --selfcheck` 生成缓存再迁移;或干脆不用语义通道
 - 自检:`node nle-semantic/server.mjs --selfcheck` → `{"ok":true,"dim":384}`
 
+**For DSH plugin developers**: this repo also ships
+[docs/DSH_DEV_EXPERIENCE.md](docs/DSH_DEV_EXPERIENCE.md) — battle-tested deep-dive notes
+(dynamic-plugin sandbox traps, fs five-arg contract, preset generations, sessionQuery
+deployment differences, tool-pipeline events) distilled from building DSNLE on `dsh`.
+**For DSH 插件开发者**:仓库另附 [docs/DSH_DEV_EXPERIENCE.md](docs/DSH_DEV_EXPERIENCE.md)
+——从零到 85KB 持久插件的全部踩坑提炼(动态插件沙箱陷阱、fs 五参契约、preset 代际语义、
+sessionQuery 部署差异、工具管线事件),与 NLE 本体无关,可独立阅读。
+
 ## 已知边界(诚实声明)
 
 - **"长期"是初步证据**:连续 20 卡(单仓库单日)累积曲线有实证;跨仓库、跨月、有害累积无数据——这正是开源想从真实使用中获得的
