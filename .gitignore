@@ -1,0 +1,10 @@
+# DSNLE 发布仓库 .gitignore
+node_modules/
+.dsnle-state.json
+.nle-semantic/
+*.req.json
+*.res.json
+spool/
+.bak-*
+*.log
+.DS_Store
