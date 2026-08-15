@@ -1,0 +1,12 @@
+{
+  "name": "dsh-cognition",
+  "version": "0.1.0",
+  "description": "A project memory for your DeepSeek Harness agent — constrain / observe / remember / verify, built on DSH native primitives.",
+  "type": "module",
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

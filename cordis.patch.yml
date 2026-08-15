@@ -1,0 +1,5 @@
+# dsh-cognition bundle patch — 让 `dsh plugin add` 可以安装 DSNLE
+# 插件入口:本仓库 nle-plugin/dsnle-plugin.mjs(常规 ESM,规则源 import 自仓库根 nle-rules-core.mjs)
+- insert:
+    - id: dsnle
+      name: ./nle-plugin/dsnle-plugin.mjs
