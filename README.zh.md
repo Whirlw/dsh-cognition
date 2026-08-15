@@ -1,13 +1,14 @@
-﻿# DSNLE — DeepSeek Harness 的项目记忆与认知层
+﻿# DSNLE — 给你的 DSH agent 一份项目记忆
 
-> **DSNLE(Neural Link Engine)** 是运行在 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)(`dsh`)上的
-> **agent 项目记忆层**:让 coding agent 对项目建立**长期持续认知**——不是一次性检索工具,
-> 而是四层自洽机制,全部长在 DSH 原生能力上(全工具闸门、内核级版本守卫、skills 知识层、会话事件溯源):
+> **DSNLE** 让你的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) agent
+> **记住你的项目**。
 >
-> **约束 → 观测 → 记忆 → 可靠**
+> 新任务自动带上你修过的历史:相似任务的历史编辑作为先例出现,越界修改被 scope 锁拦下,
+> 认知跨会话持续积累——全部由 DSH 原生机制执行(全工具闸门、内核级版本守卫、skills 知识层、
+> 会话事件溯源),不是提示词技巧。
 >
-> 状态:**研究原型 + 可用实现**。47 个真实仓库修复(官方断言验收)、245 项确定性回归、
-> 去 gold 化连续 20 卡实验全过(20/20)。诚实边界见 [docs/research/](docs/research/)。
+> **诚实状态**:研究原型,但实现可用——47 次真实仓库修复通过上游测试验收、去 gold 化连续
+> 20 任务 20/20、245 项确定性回归;边界公开([docs/research/](docs/research/))。
 
 [English](README.md)
 
@@ -18,7 +19,7 @@
 需要:Node.js ≥ 22 + DeepSeek Harness(运行中)。
 
 ```bash
-git clone https://github.com/scd13150/dsnle.git && cd dsnle
+git clone https://github.com/scd13150/dsh-cognition.git && cd dsnle
 node install-dsnle.mjs --set-default     # 创建 dsnle 预设并设为 DSH 默认(自动备份原配置)
 ```
 

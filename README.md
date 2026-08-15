@@ -1,17 +1,16 @@
-﻿# DSNLE — Project Memory & Cognition for DeepSeek Harness
+﻿# DSNLE — A project memory for your DSH agent
 
-> **DSNLE(Neural Link Engine)** is the **memory layer** for coding agents on
-> [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)(`dsh`).
-> It gives an agent **long-term, persistent cognition** about a project — not a one-shot
-> retrieval tool, but four layers of mechanisms built **entirely on DSH native primitives**
-> (per-tool waterfalls, kernel-level version guards, the skills knowledge layer, session
-> event sourcing):
+> **DSNLE** gives your [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) agent
+> **a memory of your project**.
 >
-> **constrain → observe → remember → verify**
+> New tasks start with what you already did: edits from similar past tasks surface as
+> precedents, out-of-scope edits get blocked, and knowledge keeps accumulating across sessions —
+> enforced by DSH's native mechanisms (per-tool gates, kernel-level version guards, the skills
+> knowledge layer, session event sourcing), not by prompt tricks.
 >
-> Status:**research prototype with working implementation** — 47 real-repo fixes accepted
-> by upstream test suites, 245 deterministic regression assertions, a 20-card gold-free
-> continuous run (20/20). Honest boundaries in [docs/research/](docs/research/).
+> **Honest status**: a research prototype with a *working* implementation — 47 real-repo fixes
+> verified by upstream test suites, a gold-free 20-task continuous run (20/20), 245 deterministic
+> regression assertions — and openly documented boundaries ([docs/research/](docs/research/)).
 
 [中文](README.zh.md)
 
@@ -22,7 +21,7 @@
 Requires: Node.js ≥ 22 + a running DeepSeek Harness.
 
 ```bash
-git clone https://github.com/scd13150/dsnle.git && cd dsnle
+git clone https://github.com/scd13150/dsh-cognition.git && cd dsnle
 node install-dsnle.mjs --set-default    # creates the dsnle preset and makes it DSH's default (backs up your config)
 ```
 

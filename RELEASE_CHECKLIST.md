@@ -1,10 +1,10 @@
-# 发布清单(今天上传,明天细改)
+﻿# 发布清单(今天上传,明天细改)
 
 > 目标:**今天占位,明天打磨**。DSH 生态 5 天爆发期,awesome 榜单实时建立,先发比完美重要。
 
 ## 一、今天(30 分钟内可完成)
 
-1. **建远程仓库**:GitHub 新建仓库,名字建议 `dsnle`(或 `dsh-nle`),描述用:
+1. **建远程仓库**:GitHub 新建仓库,名字建议 `dsh-cognition`(或 `dsh-nle`),描述用:
    ```
    Project memory & cognition layer for DeepSeek Harness — constrain / observe / remember / verify, built on DSH native primitives.
    ```
