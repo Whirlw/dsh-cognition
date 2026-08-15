@@ -15,16 +15,38 @@
 
 ## 快速开始(3 步)
 
+需要:Node.js ≥ 22 + DeepSeek Harness(运行中)。
+
 ```bash
 git clone <this-repo> dsnle && cd dsnle
-node install-dsnle.mjs            # 创建 dsnle agent preset(或 --into <现有预设id> 注入)
+node install-dsnle.mjs --set-default     # 创建 dsnle 预设并设为 DSH 默认(自动备份原配置)
 ```
 
-然后在 DSH 中**新建会话**并选择 `dsnle` 预设(注入模式下直接新开会话)。
-新会话自动获得 `nle_*` 工具与 `nle-learned`/`nle-reflections` 技能。
+**然后重新打开 DSH(或新建一个会话)**,新会话应看到:
 
-**前置**:DSH 运行时,agent 预设组装启用(`~/.dsh/.agent-presets/`)。
-**卸载**:删除 `~/.dsh/.agent-presets/dsnle/`(注入模式恢复 `agent.cordis.yml.bak-*`)。
+- 工具列表里有 `nle_suggest` / `nle_focus` / `nle_mutate` / `nle_select` / `nle_guard` 等
+- 技能目录出现 `nle-learned-*` 与 `nle-reflections`
+
+**验证**:新会话里跑一次 `nle_check`(无参数),返回 `ok: true` 即安装成功。
+
+### 其他安装方式
+
+- **不想改全局默认**:去掉 `--set-default`,装完在 DSH 设置页把默认预设(agent-presets → default)手动改为 `dsnle`;或仅对特定会话选择该预设
+- **加进你现有的预设**(如 router-standard):`node install-dsnle.mjs --into router-standard`(自动备份 agent.cordis.yml)
+- **查看将做什么**:任何命令加 `--dry-run`
+
+### 卸载 / 回滚
+
+- 独立模式:删除 `~/.dsh/.agent-presets/dsnle/`;若改过默认预设,恢复 `~/.dsh/settings.yaml.bak-*`
+- 注入模式:恢复 `~/.dsh/.agent-presets/<预设>/agent.cordis.yml.bak-*`
+
+### 故障排查
+
+| 现象 | 处理 |
+|---|---|
+| 新会话没有 nle_* 工具 | 确认会话用的是 dsnle 预设(设置页查看);**已运行会话不会自动获得新预设**,必须新开会话 |
+| 新会话起不来(挂载失败) | 恢复上述备份,然后到本仓库开 issue(附上 `agent.cordis.yml` 与报错) |
+| 有工具但技能目录空 | 不影响核心链路;检查 `.dsh/skills/nle-reflections/SKILL.md` 是否在持续更新 |
 
 ## 它能做什么
 

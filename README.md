@@ -17,18 +17,29 @@
 
 ---
 
-## 快速开始(3 步)
+## Quick start(3 steps)
+
+Requires: Node.js ≥ 22 + a running DeepSeek Harness.
 
 ```bash
 git clone <this-repo> dsnle && cd dsnle
-node install-dsnle.mjs            # 创建 dsnle agent preset(或 --into <现有预设id> 注入)
+node install-dsnle.mjs --set-default    # creates the dsnle preset and makes it DSH's default (backs up your config)
 ```
 
-然后在 DSH 中**新建会话**并选择 `dsnle` 预设(或注入模式下直接新开会话)。
-新会话自动获得 `nle_*` 工具与 `nle-learned`/`nle-reflections` 技能。
+**Then restart DSH (or open a new session)** — the new session should show:
 
-**前置**:DSH 运行时,且 agent 预设组装启用(`~/.dsh/.agent-presets/`)。
-卸载:删除 `~/.dsh/.agent-presets/dsnle/`(注入模式恢复 `agent.cordis.yml.bak-*`)。
+- `nle_suggest` / `nle_focus` / `nle_mutate` / `nle_select` / `nle_guard` … in your tools
+- `nle-learned-*` and `nle-reflections` in your skill catalog
+
+**Verify**: run `nle_check` (no args) in the new session — `ok: true` means installed.
+
+### Other install modes / uninstall / troubleshooting
+
+- Keep your global default untouched: omit `--set-default`, then set the default preset in DSH settings (agent-presets → default), or pick `dsnle` per session
+- Inject into an existing preset: `node install-dsnle.mjs --into <preset-id>` (backs up agent.cordis.yml)
+- Dry-run any command with `--dry-run`
+- Uninstall: delete `~/.dsh/.agent-presets/dsnle/` (+ restore `settings.yaml.bak-*` if you changed the default); injected mode: restore `agent.cordis.yml.bak-*`
+- **No tools in a new session?** The session must use the dsnle preset (check settings); **running sessions never pick up new presets — always open a fresh session**
 
 ## 怎么工作
 
