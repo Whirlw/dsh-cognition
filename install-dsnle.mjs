@@ -89,14 +89,14 @@ function setPresetDefault(presetId) {
   let cur = ''
   if (existsSync(settingsFile)) cur = readFileSync(settingsFile, 'utf8')
   const lines = cur.split('\n')
-  // 定位 agent-presets 块及其 default 行(行级,不引入 YAML 依赖)
+  // 定位 agent-presets 块及其 default 行(行级,不引入 YAML 依赖;兼容 2/4 空格缩进)
   let blockIdx = -1
   let defaultIdx = -1
   for (let i = 0; i < lines.length; i++) {
     const t = lines[i]
     if (/^agent-presets\s*:/.test(t)) blockIdx = i
-    else if (blockIdx >= 0 && defaultIdx < 0 && /^  default\s*:/.test(t)) defaultIdx = i
-    else if (blockIdx >= 0 && t.trim() && !/^  /.test(t) && !/^#/.test(t)) break
+    else if (blockIdx >= 0 && defaultIdx < 0 && /^\s{2,4}default\s*:/.test(t)) defaultIdx = i
+    else if (blockIdx >= 0 && t.trim() && !/^\s{2,4}/.test(t) && !/^#/.test(t)) break
   }
   if (defaultIdx >= 0) {
     lines[defaultIdx] = '  default: ' + presetId

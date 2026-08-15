@@ -1,4 +1,4 @@
-# DSNLE — DeepSeek Harness 的项目记忆与认知层
+﻿# DSNLE — DeepSeek Harness 的项目记忆与认知层
 
 > **DSNLE(Neural Link Engine)** 是运行在 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)(`dsh`)上的
 > **agent 项目记忆层**:让 coding agent 对项目建立**长期持续认知**——不是一次性检索工具,
@@ -18,7 +18,7 @@
 需要:Node.js ≥ 22 + DeepSeek Harness(运行中)。
 
 ```bash
-git clone <this-repo> dsnle && cd dsnle
+git clone https://github.com/scd13150/dsnle.git && cd dsnle
 node install-dsnle.mjs --set-default     # 创建 dsnle 预设并设为 DSH 默认(自动备份原配置)
 ```
 

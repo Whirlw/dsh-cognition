@@ -1,4 +1,4 @@
-# DSNLE — Project Memory & Cognition for DeepSeek Harness
+﻿# DSNLE — Project Memory & Cognition for DeepSeek Harness
 
 > **DSNLE(Neural Link Engine)** is the **memory layer** for coding agents on
 > [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)(`dsh`).
@@ -22,7 +22,7 @@
 Requires: Node.js ≥ 22 + a running DeepSeek Harness.
 
 ```bash
-git clone <this-repo> dsnle && cd dsnle
+git clone https://github.com/scd13150/dsnle.git && cd dsnle
 node install-dsnle.mjs --set-default    # creates the dsnle preset and makes it DSH's default (backs up your config)
 ```
 
