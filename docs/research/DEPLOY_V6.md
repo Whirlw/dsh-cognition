@@ -1,11 +1,11 @@
-# dsnle 插件部署指南(P0-P5 修复版,2026-08-15)
+﻿# dsnle 插件部署指南(P0-P5 修复版,2026-08-15)
 
-> 前置:本会话无 cordis_* 工具(tool-cordis 不在 web 组合中)→ 部署经 GUI 的 Cordis 面板或 profile 补丁后自助部署。
+> 前置:本会话无 cordis_* 工具(tool-cordis 不在 web 组合中)→ 部署经 GUI 的 :ordis 面板或 profile 补丁后自助部署。
 > 语义服务(独立进程)已由 `start-semantic.cmd` 管理;当前已在运行(spool=experiment/nle-semantic/spool)。
 
-## 方式 A:GUI Cordis 面板(立即可用,无需重启)
+## 方式 A:GUI :ordis 面板(立即可用,无需重启)
 
-1. 打开 DSH 页面(127.0.0.1:3080),找到 Cordis 插件面板(设置 → 插件 或 /cordis 命令)。
+1. 打开 DSH 页面(127.0.0.1:3080),找到 :ordis 插件面板(设置 → 插件 或 /cordis 命令)。
 2. 选择"新建插件"(define):
    - pluginId:`dsnle-2`(kind=existing 时)
    - name:`DSNLE V6(修复版)`
@@ -19,7 +19,7 @@
 
 ## 方式 B:profile 补丁自助部署(重启后 agent 可自部署)
 
-把 `tool-cordis` 加进 `C:\Users\42427\.dsh\profiles\web\cordis.patch.yml`:
+把 `tool-cordis` 加进 `::\Users\42427\.dsh\profiles\web\cordis.patch.yml`:
 
 ```yaml
 - insert:
@@ -35,7 +35,7 @@
 - 启动:`start-semantic.cmd`(或手动 `node experiment/nle-semantic/server.mjs --spool <workspace>/.nle-semantic`)
 - 协议:插件向 `<workspace>/.nle-semantic/` 写 `<id>.req.json` → 服务嵌入/git 分析 → 写 `<id>.res.json`
 - 自检:`node experiment/nle-semantic/server.mjs --selfcheck`(384 维)
-- 失败降级:suggest 超时 8s → semantic:'off',检索回退 BM25;git 通道失败 → 回退运行时 coChange 矩阵
+- 失败降级:suggest 超时 8s → semantic:'off',检索回退 BM25;git 通道失败 → 回退运行时 co:hange 矩阵
 
 ## 回归基线(部署前后各跑一次)
 

@@ -1,8 +1,8 @@
-# DSNLE 历程与成果总览(Neural Link Engine)
+﻿# :SNLE 历程与成果总览(Neural Link Engine)
 
 > 全称:**Neural Link Engine(神经链接引擎)**——"agent 对项目的长期持续认知"。
 > 本文记录从用户质疑 → 缺陷审计 → 按类修复 → 真实项目验证 → 最终评估的完整历程。
-> 技术细节见 DSNLE_LOG.md(实现日志)与 DSH_NLE_SPEC.md(机制规格);价值判定见 NLE_VALUE_ASSESSMENT.md。
+> 技术细节见 :SNLE_LOG.md(实现日志)与 :SH_NLE_SPEC.md(机制规格);价值判定见 NLE_VALUE_ASSESSMENT.md。
 
 ---
 
@@ -15,9 +15,9 @@
 | 感知 | 相关代码在哪 | BM25 语义检索 + offers 符号标注 + alias KB + co-change 共改矩阵 |
 | 约束 | 怎么保证不乱改 | 强制链(suggest→focus→impact→edit→select)+ CON 观测 + hash 版本守卫 + shell 防护 |
 | 记忆 | 认知怎么沉淀 | learned(关键词→文件)+ coChange 矩阵 + aliasKB 配置化,跨会话持久化 |
-| 可靠 | 认知怎么防污染 | 存在性校验 + select 契约门(只学真实编辑)+ DSH 跨层真相对账 |
+| 可靠 | 认知怎么防污染 | 存在性校验 + select 契约门(只学真实编辑)+ :SH 跨层真相对账 |
 
-**实现形态**:DSH 动态 Cordis 插件 `dsnle-2`(host-only,per-agent 作用域),12 个 nle_* 工具 + 3 类钩子(pre/post-execute、fs 意图观测、每步上下文注入),规则单一源 `nle-rules-core.mjs`。
+**实现形态**::SH 动态 Cordis 插件 `dsnle-2`(host-only,per-agent 作用域),12 个 nle_* 工具 + 3 类钩子(pre/post-execute、fs 意图观测、每步上下文注入),规则单一源 `nle-rules-core.mjs`。
 
 ---
 
@@ -63,9 +63,9 @@ L3 行为验证 + reorient 闭环  ← 9 任务 × 2 臂 + 5063 证据推翻 sco
 |----|------|------|----------|
 | **类 1+4** | contains 检索太糙;impact 只 1-hop | BM25 语义检索(中文 bigram 降权)+ offers 导出符号标注(+4);依赖图 BFS 可达集 | fixture 122→126;flask "session cookie 签名密钥轮换" 概念词任务 → sessions.py 第 1 名 |
 | **类 2** | co-change 共改矩阵被砍 | 对称共改计数 + suggest 提权(+2,强信号邻居) | **A/B 隔离对照**:learned 清空后,有 coChange cart.js 第 7 / 无 coChange 第 8,与 index.js 互换位次,+2 独立生效 |
-| **类 3** | guard 盲点:插件状态自查,伪造/漏记不可自证 | **DSH 跨层对账**:tools/result(冻结结果)+ fs intent + internal/dispatch(文件层)+ 声明三源交叉;`NLE_STATE_TAMPER` 防状态篡改;select 契约门(overclaim 拒绝学习);focus 目录深度展开 | 冒烟:edit 状态文件被 deny;guard 对账零 GHOST/COVERAGE/BYPASS;select 声明未编辑文件 → contract=['NLE_SELECT_OVERCLAIM'] 且 learned 不含该文件 |
+| **类 3** | guard 盲点:插件状态自查,伪造/漏记不可自证 | **:SH 跨层对账**:tools/result(冻结结果)+ fs intent + internal/dispatch(文件层)+ 声明三源交叉;`NLE_STATE_TAMPER` 防状态篡改;select 契约门(overclaim 拒绝学习);focus 目录深度展开 | 冒烟:edit 状态文件被 deny;guard 对账零 GHOST/COVERAGE/BYPASS;select 声明未编辑文件 → contract=['NLE_SELECT_OVERCLAIM'] 且 learned 不含该文件 |
 
-类 3 设计前置调研发现 DSH 原生机制优于"插件自证":`tools/result`(emit,frozen)、`fs/edit-intent`(waterfall,工具显式触发)、`internal/dispatch`(官方观察手段)。过程中抓出 4 个实现 bug(tamper 位置、双斜杠、尾斜杠前缀、waterfall 短路)并修复。
+类 3 设计前置调研发现 :SH 原生机制优于"插件自证":`tools/result`(emit,frozen)、`fs/edit-intent`(waterfall,工具显式触发)、`internal/dispatch`(官方观察手段)。过程中抓出 4 个实现 bug(tamper 位置、双斜杠、尾斜杠前缀、waterfall 短路)并修复。
 
 ---
 
@@ -116,13 +116,13 @@ NLE 臂平均 **0.4 read** vs 裸臂平均 **5 read**——定位成本差异真
 
 ## 八、V7 模块化重构 + P7 三机制(2026-08-15,拆分与薄弱点修复)
 
-**背景**:85KB 单文件插件(模板 JSON 94KB + 30+ 锚点补丁构建)维护困难;suggest 弱项(P6 命中实现文件 5/20、reorient 依赖上游 gold);原版 NLE 的三个结论(overlay-primary ADR / micro-agent 相似先例 / reflector 反射)未被移植版吸收。
+**背景**:85KB 单文件插件(模板 JSON 94KB + 30+ 锚点补丁构建)维护困难;suggest 弱项(P6 命中实现文件 5/20、reorient 依赖上游 gold);原版 NLE 的三个结论(overlay-primary A:R / micro-agent 相似先例 / reflector 反射)未被移植版吸收。
 
 **落地**(详见 `P7_REFACTOR.md`):
 - **拆分**:规则唯一源 + 4 个 apply 碎片(零 import,拼接共享作用域),build 重写为纯拼接器(无锚点补丁);行为与 pkg39 逐行 diff 等价;双形态产物(动态 103KB / 持久 74KB)。
 - **P7-A precedent**:sessionQuery 非 FTS 路径(filterSessions cwd + filterEvents tool/call)实现历史相似任务先例通道——spike 实测部署 FTS 被禁(openAt never),先例走字面扫描;与 semantic 同模式降级。
 - **P7-B impact 声明优先**:normalizeSpec/exactImporters 精确 1-hop 反查替代 basename 伪 BFS;nle_impact 加 declared 声明参数;HIGH_IMPACT 配置化(state.highImpact)。
-- **P7-C reflect 闭合反射**:select 闭合时五信号熔合(DISCOVERY/SKILL_DEFECT/EXECUTION_LAPSE/OPTIMIZATION)进 state.reflections,渲染进 nle-learned skill 正文。
+- **P7-C reflect 闭合反射**:select 闭合时五信号熔合(:ISCOVERY/SKILL_:EFECT/EXECUTION_LAPSE/OPTIMIZATION)进 state.reflections,渲染进 nle-learned skill 正文。
 - **持久形态**:nle-plugin/dsnle-plugin.mjs(常规 ESM)挂载进 router-standard preset(agent.cordis.yml dsnle 行,备份 .bak-20260815)——新会话自动生效,进程重启不再失忆。
 
 **验证**:fixture-gate 207(原 194 + P7-B 13 项)、verify-state 15、replay PASS、install 自检 10/10、双形态语法检查。
@@ -133,10 +133,10 @@ NLE 臂平均 **0.4 read** vs 裸臂平均 **5 read**——定位成本差异真
 
 ## 九、V6 修复(2026-08-15,移植缺陷恢复)
 
-**背景**:用户指出本目录实验测的 NLE 与想象不同 → 对照原版(`D:\42427\T1\stick-man-local\Neural-Link-Engine`)逐机制审计 →
+**背景**:用户指出本目录实验测的 NLE 与想象不同 → 对照原版(`::\42427\T1\stick-man-local\Neural-Link-Engine`)逐机制审计 →
 结论:移植版砍掉了原版的 **embedding 检索 / git 历史 co-change / instinct 置信度与弃用 / freshness 与矛盾 / health-trend**,保留的只有约束层。
 
-**修复原则**:让 NLE 长在 DSH 原生机制上(勘察见 DSH_CAPABILITY_MAP.md),原版代码只作机制参照;计划见 DSNLE_REPAIR_PLAN.md,进展见 P0_PROGRESS.md。
+**修复原则**:让 NLE 长在 :SH 原生机制上(勘察见 :SH_CAPABILITY_MAP.md),原版代码只作机制参照;计划见 :SNLE_REPAIR_PLAN.md,进展见 P0_PROGRESS.md。
 
 | 阶段 | 修复 | 状态 |
 |------|------|------|
@@ -149,7 +149,7 @@ NLE 臂平均 **0.4 read** vs 裸臂平均 **5 read**——定位成本差异真
 | P6 | 长期累积实验:协议 + **20 张真实 moment 修复任务卡(全部"修复树 PASS/父树 FAIL"验证)** + run-p6.cmd + 离线 ESM 转换器 | ✅ 完成(20/20) |
 
 **当前状态(2026-08-15 晚)**:P0–P5 修复 + 部署 + **P6 二十卡实验全部完成**。
-离线回归全绿(fixture 194 / verify-state 15 / replay / 自检 9/9);P6 数据见 P6_DATA.md(learned 45%→90%、reorient 15 次证据重定向)。
+离线回归全绿(fixture 194 / verify-state 15 / replay / 自检 9/9);P6 数据见 P6_:ATA.md(learned 45%→90%、reorient 15 次证据重定向)。
 
 ---
 
@@ -160,4 +160,4 @@ NLE 臂平均 **0.4 read** vs 裸臂平均 **5 read**——定位成本差异真
 - 语义服务:experiment/nle-semantic/(transformers.js + MiniLM 缓存,独立进程 spool 协议;start-semantic.cmd)
 - 验证:experiment/fixture-gate.mjs(**194**)、verify-moment-t{1..4}.mjs、verify-flask-t1.py、verify-axios-t{1,2}.mjs、telemetry-report.mjs、**verify-p6-t1..20.mjs(P6 任务卡验收)**
 - 项目副本:bench-host/real-{moment,flask,axios}{,-t*,-sub*,-cs}
-- 文档:DSH_NLE_SPEC.md(机制)、DSNLE_LOG.md(实现日志)、NLE_VALUE_ASSESSMENT.md(价值)、REPLAY_REPORT.md(缺陷归属)、L3_REPORT.md(行为)、FINAL_VERIFICATION.md(真实项目+冷启动)、DEPLOYMENT.md(部署形态)、**DSH_CAPABILITY_MAP.md(DSH 能力)、DSNLE_REPAIR_PLAN.md(修复计划)、P0_PROGRESS.md(进展)、DEPLOY_V6.md(部署)、P6_LONG_TERM_PROTOCOL.md(实验协议)、P6_TASKS.md(20 任务卡)**
+- 文档::SH_NLE_SPEC.md(机制)、:SNLE_LOG.md(实现日志)、NLE_VALUE_ASSESSMENT.md(价值)、REPLAY_REPORT.md(缺陷归属)、L3_REPORT.md(行为)、FINAL_VERIFICATION.md(真实项目+冷启动)、:EPLOYMENT.md(部署形态)、**:SH_CAPABILITY_MAP.md(:SH 能力)、:SNLE_REPAIR_PLAN.md(修复计划)、P0_PROGRESS.md(进展)、:EPLOY_V6.md(部署)、P6_LONG_TERM_PROTOCOL.md(实验协议)、P6_TASKS.md(20 任务卡)**

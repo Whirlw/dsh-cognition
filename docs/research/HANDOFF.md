@@ -1,4 +1,4 @@
-# DSH-NLE 交接文档(换会话用)
+﻿# DSH-NLE 交接文档(换会话用)
 
 > 用户目标:**在 DSH 上完整实现 NLE**(基于 DSH 独特优势),实现完成前不做行为实验。
 > 教训:"不完整实现测试就是白测"——之前的实验反复失败源于实现不完整 + 管道污染。
@@ -7,14 +7,14 @@
 
 | 文件 | 内容 |
 |------|------|
-| `D:\42427\DsH\experiment\DSH_NLE_SPEC.md` | **完整实现规格**(机制清单、DSH 映射、数据模型、工具集、强制链 L0-L4、实现阶段 V1-V4、验收标准) |
+| `<workspace>/experiment/DSH_NLE_SPEC.md` | **完整实现规格**(机制清单、DSH 映射、数据模型、工具集、强制链 L0-L4、实现阶段 V1-V4、验收标准) |
 | 本文件 | 交接、资产、教训 |
-| `D:\42427\DsH\experiment\SWE_MICROBENCH.md` | 上一个实验的结论(5063 暴露 scope 锁方向风险) |
-| `D:\42427\DsH\experiment\COGNITION_ROUND2.md` | 认知实验结论(观测层 drifted 场景有效) |
+| `<workspace>/experiment/SWE_MICROBENCH.md` | 上一个实验的结论(5063 暴露 scope 锁方向风险) |
+| `<workspace>/experiment/COGNITION_ROUND2.md` | 认知实验结论(观测层 drifted 场景有效) |
 
 ## 二、环境事实(重要)
 
-- 工作区根:`D:\42427\DsH`;会话工作区 = 此目录
+- 工作区根:`<workspace>`;会话工作区 = 此目录
 - DSH 插件机制:动态 Cordis 插件(`cordis_define`/`cordis_run`),host 代码纯 JS,无 import;工具经 `harness.defineTool` + `harness.registerTool(ctx, tool)`;事件经 `ctx.on`
 - **插件是会话级**:换会话后旧插件(nle-1)不存在,需在新会话重新 `cordis_define`(新 pluginId)。状态文件 `.nle-poc-state.json` 在工作区根,旧数据可读但建议新实现用新文件名(如 `.dsnle-state.json`)
 - 关键 DSH API(已查证):
