@@ -1,4 +1,4 @@
-﻿# DSNLE — 给你的 DSH agent 一份项目记忆
+# DSNLE — 给你的 DSH agent 一份项目记忆
 
 > **DSNLE** 让你的 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) agent
 > **记住你的项目**。
@@ -10,13 +10,95 @@
 > **诚实状态**:研究原型,但实现可用——47 次真实仓库修复通过上游测试验收、去 gold 化连续
 > 20 任务 20/20、245 项确定性回归;边界公开([docs/research/](docs/research/))。
 
+> **这是 fork** —— [Whirlw/dsh-cognition](https://github.com/Whirlw/dsh-cognition),上游
+> [scd13150/dsh-cognition](https://github.com/scd13150/dsh-cognition) 的 `500caf2` 加三个 commit。
+> 修的是在 DSH 0.2.1 上坏掉的三件事:**bundle 安装一个工具都不注册**、git 通道崩溃、C# 不算源码。
+> **安装方式与上游不同**,见[本 fork 的差异](#本-fork-的差异)。
+
 [English](README.md)
+
+---
+
+## 本 fork 的差异
+
+上游 [scd13150/dsh-cognition](https://github.com/scd13150/dsh-cognition) 的 `500caf2` + 三个 commit
+(`git log 500caf2..main`)。仪式链、opt-in 门控、learned/先例、`root` 语义、preset 安装脚本都是上游原样;
+下面是本 fork 的改动,全部在 DSH `0.2.1-rc.3`(Windows 桌面)实测。
+
+### 1. bundle 安装重新能注册工具 —— `fix(load)`
+
+用 `dsh plugin add` 装上游,插件会**正常装载、但一个工具都不注册**,而且哪里都不报错。原因是 0.2.x 里
+`fs` 与 `tools` 是 **agent 作用域**服务:profile 层的入口 `ctx.get('fs')` 是 undefined,`apply()` 在建表
+之前就 return 了。上游只走 preset 安装(本身就是 per-agent),所以作者没遇到过。
+
+新增 `nle-plugin/dsnle-agent-mount.mjs` 监听 `agent/created`(载荷 `{ agent, source, signal }`),把插件
+挂进每个 agent 的 `ctx`;`cordis.patch.yml` 改成只挂这个挂载器。实测:每个 agent 13 个工具,
+`~/.dsh/logs/nle-apply.log` 末尾是 `{"phase":"apply-ready","tools":13}`。
+
+### 2. 语义 helper:单实例 + 自启动 —— `fix(semantic)`
+
+- **`server.pid` 单实例锁,在加载模型之前判定**:DSH 重启后旧 helper 还活着,没锁就会叠出第二份 1.2GB 进程;陈旧 pid 会被接管
+- **自启动、不监管**:挂载器为「已有 `.dsnle-state.json`」的工作区以 detached 方式拉起 helper(输出到
+  `<工作区>/.nle-semantic/server.log`)。`NLE_SEMANTIC=off` 关、`NLE_SEMANTIC=on` 强制开;每个工作区一份,锁挡重复
+- **git 通道修好**:全量 `git log --name-only` 撑爆 V8 字符串上限(`Invalid string length`),共改请求全部失败;
+  子目录 root 会双写前缀导致永远查不中;Unity 仓库里 `.meta`/`.prefab` 把载荷撑到 2.5MB。现在加了 `-n` 上限、
+  用 `git rev-parse --show-toplevel` 反推前缀、只保留源码路径
+
+### 3. C# / ShaderLab / HLSL 算源码 —— `feat(rules)`
+
+`SOURCE_RE` 只有 `js|mjs|cjs|jsx|ts|tsx|py`,在 Unity 工程上 `nle_suggest` 返回空——插件对自己该记的代码
+视而不见。扩展名与源码目录段抽成共享常量(`SOURCE_EXTS` / `SOURCE_DIRS`,以后加 `uxml|uss` 只改一行),
+5 处内联正则统一引用;`SCAN_SKIP_DIRS` 补 `Library/Temp/obj/Logs/UserSettings/PackageCache/TextMesh Pro/…`,
+因为扫描器每轮最多走 **120 个目录**,Unity 产物会把预算吃光。
+
+### 装本 fork
+
+```bash
+git clone https://github.com/Whirlw/dsh-cognition
+dsh plugin --profile <profile> add link:/path/to/dsh-cognition
+# 或免克隆:
+dsh plugin --profile <profile> add github:Whirlw/dsh-cognition
+```
+
+必须指向**克隆目录或 git 仓库**:本 fork 没有 npm 发布,修复都在包文件里,装一份不含修复的副本就会退回
+「装了但没工具」。装完重启 DSH,新会话跑 `nle_check`。上游的 preset 安装(`node install-dsnle.mjs`)照样可用。
+
+### 数据在哪
+
+| 路径 | 内容 | 说明 |
+|---|---|---|
+| `<工作区>/.dsnle-state.json` | 记忆本体:`root`、任务锁、cells、`learned`、`aliasKB`、`highImpact` | 按工作区隔离;唯一值得备份的文件 |
+| `<工作区>/.dsh/skills/nle-reflections/SKILL.md` | `learned` 的技能快照 | 自动重写 |
+| `<工作区>/.nle-semantic/` | helper spool:`server.pid`、`server.log`、瞬时 `*.req/res.json` | 可随便删 |
+| `~/.dsh/logs/nle-apply.log` | 本 fork 的装载/自启动诊断 | 每会话几行 |
+
+重装插件不动记忆;改 `root` 会让 `learned` 失效(条目带 `projectId = fnv1a(root)`)。
+
+### 语义通道(本 fork)
+
+```bash
+cd nle-semantic && npm i @huggingface/transformers   # 一次性,含 onnxruntime 约 550MB
+node server.mjs --selfcheck                          # 下载 87MB 模型 → {"ok":true,"dim":384}
+```
+
+之后由挂载器自动拉起。依赖缺失时 spawn 会退出,只在 `<工作区>/.nle-semantic/server.log` 留痕。
+语义只做**重排**,不能把 0 候选救回来——纯中文任务仍需 `aliasKB` 或已积累的 `learned`。
+
+### 本 fork 的已知限制
+
+- 120 目录扫描预算,所以 `root` 要保持窄(参考:`Assets/Game`,118 目录 / 490 个 `.cs`,队列跑空);`root` 放太宽会静默少扫
+- `learned` 按工作区隔离但共用一个文件:同一工作区两个会话同时跑 NLE 任务,后写的覆盖前者
+- 挂载器在 `agent/created` 时挂载,所以安装前已开着的会话要等新会话或重启才看到工具
+- 每个初始化过 NLE 的工作区一份 helper:装载后约 180MB,重活后约 1.2GB
 
 ---
 
 ## 快速开始(3 步)
 
 需要:Node.js ≥ 22 + DeepSeek Harness(运行中)。
+
+> 下面是上游的 preset 路线,在本 fork 里照样可用。三个 commit 修的是**bundle 路线**
+> (见[装本 fork](#装本-fork)),0.2.x 上建议走那条。
 
 ```bash
 git clone https://github.com/scd13150/dsh-cognition.git && cd dsnle
@@ -107,6 +189,10 @@ install-dsnle.mjs         安装脚本(standalone / --into 两模式)
 
 改代码 → `node nle-plugin/build-dsnle.mjs` → 重跑安装脚本 → 新会话生效。
 回归:`node smoke-test.mjs`(无文件依赖纯函数断言,32 项)。
+
+本 fork 的 `nle-plugin/dsnle-plugin.mjs` 还会把装载诊断写到 `~/.dsh/logs/nle-apply.log`
+(`apply-enter` / `early-return` / `register-skipped` / `apply-ready`)。该文件由 `build-dsnle.mjs` 从
+`frag-apply-*.mjs` 重新生成,所以重建会丢掉这段诊断;`nle-plugin/dsnle-agent-mount.mjs` 是独立文件,不受影响。
 
 ## License
 

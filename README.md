@@ -1,4 +1,4 @@
-﻿# DSNLE — A project memory for your DSH agent
+# DSNLE — A project memory for your DSH agent
 
 > **DSNLE** gives your [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) agent
 > **a memory of your project**.
@@ -12,13 +12,115 @@
 > verified by upstream test suites, a gold-free 20-task continuous run (20/20), 245 deterministic
 > regression assertions — and openly documented boundaries ([docs/research/](docs/research/)).
 
+> **This is a fork** — [Whirlw/dsh-cognition](https://github.com/Whirlw/dsh-cognition), forked from
+> [scd13150/dsh-cognition](https://github.com/scd13150/dsh-cognition) at `500caf2`. Three commits fix
+> what broke on DSH 0.2.1: the bundle install registered **no tools at all**, the git channels crashed,
+> and C# was not treated as source. **Install steps differ from upstream** — see
+> [What this fork changes](#what-this-fork-changes).
+
 [中文](README.zh.md)
+
+---
+
+## What this fork changes
+
+Fork of [scd13150/dsh-cognition](https://github.com/scd13150/dsh-cognition) at `500caf2`, plus three
+commits (`git log 500caf2..main`). The ritual chain, opt-in gating, learned/precedent memory, `root`
+semantics and the preset installer are upstream, untouched. Everything below is this fork.
+Everything was verified on DSH `0.2.1-rc.3`, Windows desktop profile.
+
+### 1. The bundle install registers tools again — `fix(load)`
+
+Installed as a bundle (`dsh plugin add`), upstream loads cleanly and registers **zero** tools, with no
+error anywhere. On DSH 0.2.x `fs` and `tools` are **agent-scoped** services: a profile-level entry sees
+`ctx.get('fs') === undefined`, and `apply()` returns before the tool table is built. Upstream only ever
+mounts per agent (via `install-dsnle.mjs` → preset), which is why the author never hit this.
+
+`nle-plugin/dsnle-agent-mount.mjs` listens for `agent/created` (payload `{ agent, source, signal }`) and
+mounts the plugin into each agent's `ctx`; `cordis.patch.yml` now inserts only the mounter. Verified: 13
+tools per agent, and `~/.dsh/logs/nle-apply.log` ends with `{"phase":"apply-ready","tools":13}`.
+
+### 2. Semantic helper: one instance, and it autostarts — `fix(semantic)`
+
+- **`server.pid` lock, taken before the model loads.** A DSH restart leaves the previous ~1.2 GB helper
+  alive; without the lock the next spawn added a second one. A stale pid is taken over.
+- **Autostart, no supervision.** The mounter spawns the helper (detached, output to
+  `<workspace>/.nle-semantic/server.log`) for a workspace that already has `.dsnle-state.json`.
+  `NLE_SEMANTIC=off` disables it, `NLE_SEMANTIC=on` forces it for any workspace. One helper per
+  workspace; the lock rejects duplicates, so restarting DSH never stacks processes.
+- **git channels fixed.** Three real defects: a full `git log --name-only` blew V8's string limit
+  (`Invalid string length`) so *every* co-change request failed; a project root below the repo root
+  produced doubly-prefixed keys so co-change never matched; Unity repos inflated the payload to ~2.5 MB
+  with `.meta`/`.prefab` noise. Now bounded with `-n`, prefix derived from
+  `git rev-parse --show-toplevel`, source paths only.
+
+### 3. C# / ShaderLab / HLSL are source — `feat(rules)`
+
+`SOURCE_RE` listed only `js|mjs|cjs|jsx|ts|tsx|py`, so on a Unity project `nle_suggest` returned
+**nothing** — the plugin was blind to the code it was meant to remember. Extensions and source-dir
+segments are now shared constants (`SOURCE_EXTS`, `SOURCE_DIRS`; adding `uxml|uss` is one line), the five
+inline extension regexes reuse them, and `SCAN_SKIP_DIRS` covers
+`Library/Temp/obj/Logs/UserSettings/PackageCache/TextMesh Pro/…` — the scanner walks at most **120
+directories**, and Unity artefacts ate the whole budget.
+
+### Install this fork
+
+```bash
+git clone https://github.com/Whirlw/dsh-cognition
+dsh plugin --profile <profile> add link:/path/to/dsh-cognition
+# or without cloning:
+dsh plugin --profile <profile> add github:Whirlw/dsh-cognition
+```
+
+Point the profile at the **clone or the git repo**. There is no npm release of this fork, and the fixes
+live in the package files: installing a copy without them silently reverts to *installed, no tools*.
+Restart DSH (new JS modules need a new process), then run `nle_check` in a fresh session.
+
+Upstream's preset route (`node install-dsnle.mjs`) still works and needs none of this — it already
+mounts per agent.
+
+### Where the data lives
+
+| Path | What | Notes |
+|---|---|---|
+| `<workspace>/.dsnle-state.json` | the memory: `root`, ritual lock, cells, `learned`, `aliasKB`, `highImpact` | per workspace; the only file worth backing up |
+| `<workspace>/.dsh/skills/nle-reflections/SKILL.md` | `learned` snapshot exposed as a skill | regenerated |
+| `<workspace>/.nle-semantic/` | helper spool: `server.pid`, `server.log`, transient `*.req/res.json` | safe to delete |
+| `~/.dsh/logs/nle-apply.log` | this fork's load/autostart diagnostics | a few lines per session |
+
+Reinstalling the plugin never touches the memory. Changing `root` orphans `learned`: entries carry
+`projectId = fnv1a(root)`.
+
+### Semantic channel (this fork)
+
+```bash
+cd nle-semantic && npm i @huggingface/transformers   # once; ~550 MB with onnxruntime
+node server.mjs --selfcheck                          # downloads the 87 MB model → {"ok":true,"dim":384}
+```
+
+After that the mounter starts it automatically. If the dependency is missing, the spawn exits and only
+`<workspace>/.nle-semantic/server.log` records why. Semantics **re-rank** an existing candidate pool —
+they cannot rescue a zero-candidate query, so Chinese-only tasks still need `aliasKB` or accumulated
+`learned`.
+
+### Known limits of this fork
+
+- The 120-directory scan budget is why `root` stays narrow (reference setup: `Assets/Game`, 118
+  directories, 490 `.cs` files, queue drained). A wider `root` silently scans less.
+- `learned` is per workspace and shared through one file: two sessions running NLE tasks in the same
+  workspace clobber each other on the last write.
+- The mounter attaches on `agent/created`, so sessions already open when you install keep their old tool
+  list until a new session or a restart.
+- One helper per NLE-initialised workspace: ~180 MB after load, ~1.2 GB after heavy embedding.
 
 ---
 
 ## Quick start(3 steps)
 
 Requires: Node.js ≥ 22 + a running DeepSeek Harness.
+
+> Upstream's preset route: it still works in this fork as-is. What the three commits fix is the
+> **bundle** route in [Install this fork](#install-this-fork) — on DSH 0.2.x prefer it.
 
 ```bash
 git clone https://github.com/scd13150/dsh-cognition.git && cd dsnle
@@ -114,6 +216,11 @@ install-dsnle.mjs         ← 安装脚本(standalone / --into 两模式)
 改代码 → `node nle-plugin/build-dsnle.mjs` → 重跑安装脚本(覆盖 preset 内副本)→ 新会话生效。
 规则层回归:`node smoke-test.mjs`(无文件依赖纯函数断言)。
 实验装置完整回归(fixture-gate 245 断言)依赖实验仓库,不在本仓库分发。
+
+In this fork `nle-plugin/dsnle-plugin.mjs` also writes load diagnostics to `~/.dsh/logs/nle-apply.log`
+(`apply-enter` / `early-return` / `register-skipped` / `apply-ready`). `build-dsnle.mjs` regenerates that
+file from `frag-apply-*.mjs`, so a rebuild drops the diagnostics; `nle-plugin/dsnle-agent-mount.mjs` is a
+standalone file and survives.
 
 ## License
 
