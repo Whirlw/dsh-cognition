@@ -3,8 +3,9 @@
 // 协议:文件 spool——watchDir 下出现 <id>.req.json {text} → 嵌入 → 写 <id>.res.json {ok, vector, ms}
 // 用法:node nle-semantic/server.mjs [--spool <dir>] [--once <text>] [--selfcheck]
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync, statSync, rmSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { join, dirname, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFileSync } from 'node:child_process'
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
 const MODEL = 'Xenova/all-MiniLM-L6-v2'
@@ -47,22 +48,74 @@ const gitCacheSet = (cache, key, data) => {
   return data
 }
 
+// ---------------------------------------------------------------------------
+// [本地定制 2026-11-12] 两个真实工程踩到的坑:
+//  ① 全量 `git log --name-only` 会让 V8 字符串撑爆("Invalid string length"),
+//     所以三处 git 调用都加 -n 上限。
+//  ② git 输出是**仓库相对**路径(Assets/Game/...),而插件的检索键是**工作区相对**
+//     路径(OpenSekai/Assets/Game/...)。插件传的 prefix 是「项目根相对工作区」,
+//     直接拼会得到双层前缀。这里用 `git rev-parse --show-toplevel` 反推真实前缀。
+// ---------------------------------------------------------------------------
+const GIT_LOG_CAP = 120
+const GIT_CHURN_CAP = 400
+const GIT_ROLLBACK_CAP = 200
+const GIT_MATRIX_CAP = 3000
+
+function gitPrefixFor(rootDir, prefix) {
+  const normSlash = (s) => String(s || '').replace(/\\/g, '/').replace(/\/+$/, '')
+  const p = normSlash(prefix).replace(/^\/+/, '')
+  // 反推:repoTop → rootDir 的相对段(如 Assets/Game),从 prefix 尾部剥掉,
+  // 剩下的就是「仓库顶层相对工作区」的路径(如 OpenSekai),这才是 git 输出该补的前缀。
+  try {
+    const top = normSlash(String(execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: rootDir, encoding: 'utf8', maxBuffer: 1024 * 1024 })).trim())
+    const rel = normSlash(relative(top, normSlash(rootDir)))
+    if (!rel || rel === '.') return p
+    const lp = p.toLowerCase()
+    const lr = rel.toLowerCase()
+    if (lp === lr) return ''
+    if (lp.endsWith('/' + lr)) return p.slice(0, p.length - (lr.length + 1))
+    return p
+  } catch (e) {
+    return p
+  }
+}
+
+function capMatrix(data, max = GIT_MATRIX_CAP) {
+  if (!data || !data.matrix) return data
+  const keys = Object.keys(data.matrix)
+  if (keys.length <= max) return data
+  const keep = keys
+    .map((k) => [k, (data.matrix[k] || []).length])
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([k]) => k)
+  const kept = new Set(keep)
+  const matrix = {}
+  for (const k of keep) matrix[k] = (data.matrix[k] || []).filter((n) => kept.has(n))
+  return { commits: data.commits, matrix, touched: (data.touched || []).filter((t) => kept.has(t)) }
+}
+
 export async function gitCoChange(rootDir, prefix) {
   const key = String(rootDir || '')
   const cached = gitCacheGet(_gitCache, key, 60000)
   if (cached !== undefined) return cached
   const { execFileSync } = await import('node:child_process')
-  const { parseGitNameOnly, coChangeFromFileSets, remapGitSets } = await import('../nle-rules-core.mjs')
+  const { parseGitNameOnly, coChangeFromFileSets, remapGitSets, SOURCE_RE } = await import('../nle-rules-core.mjs')
   let out = ''
   try {
-    out = execFileSync('git', ['log', '--name-only', '--pretty=format:'], { cwd: key, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    out = execFileSync('git', ['log', '-n', String(GIT_LOG_CAP), '--name-only', '--pretty=format:'], { cwd: key, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
   } catch (e) {
     return gitCacheSet(_gitCache, key, null)
   }
   // P7 修复①:键空间重写——git 输出仓库相对路径 → 补 root 前缀,与 suggest 检索文件键同空间
-  const sets = remapGitSets(parseGitNameOnly(out), prefix || '')
+  // [本地定制] 前缀改由 git 顶层目录反推,避免子目录 root 下的双层前缀
+  // [本地定制] 只保留源码路径:Unity 仓库里 .meta/.prefab/.md 会把矩阵撑到上万键,
+  // 而插件只对候选源码文件提权,这些邻居命不中,纯属传输负担。
+  const sets = remapGitSets(parseGitNameOnly(out), gitPrefixFor(key, prefix))
+    .map((s) => s.filter((f) => SOURCE_RE.test(f)))
+    .filter((s) => s.length > 0)
   const { matrix, touched } = coChangeFromFileSets(sets)
-  const data = { commits: sets.length, matrix, touched }
+  const data = capMatrix({ commits: sets.length, matrix, touched })
   return gitCacheSet(_gitCache, key, data)
 }
 
@@ -75,15 +128,18 @@ export async function gitChurn(rootDir, prefix, sinceDays = 90) {
   const { execFileSync } = await import('node:child_process')
   let out = ''
   try {
-    out = execFileSync('git', ['log', '--name-only', '--pretty=format:', '--since=' + sinceDays + ' days ago'], { cwd: rootDir, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+    out = execFileSync('git', ['log', '-n', String(GIT_CHURN_CAP), '--name-only', '--pretty=format:', '--since=' + sinceDays + ' days ago'], { cwd: rootDir, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
   } catch (e) {
     return gitCacheSet(_gitChurnCache, key, null)
   }
   const counts = {}
-  const p = String(prefix || '').replace(/\/+$/, '')
+  // [本地定制] 前缀反推(同 gitCoChange),避免子目录 root 双层前缀
+  const p = gitPrefixFor(rootDir, prefix).replace(/\/+$/, '')
+  const { SOURCE_RE } = await import('../nle-rules-core.mjs')
   for (const raw of out.split('\n')) {
     const t = raw.trim()
     if (!t || t.includes('=>')) continue
+    if (!SOURCE_RE.test(t)) continue
     const f = p ? p + '/' + t : t
     counts[f] = (counts[f] || 0) + 1
   }
@@ -100,12 +156,13 @@ export async function gitRollbacks(rootDir, prefix, sinceDays = 30) {
   const { execFileSync } = await import('node:child_process')
   let out = ''
   try {
-    out = execFileSync('git', ['log', '--since=' + sinceDays + ' days ago', '--grep=revert', '-i', '--pretty=format:%H %s'], { cwd: rootDir, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
+    out = execFileSync('git', ['log', '-n', String(GIT_ROLLBACK_CAP), '--since=' + sinceDays + ' days ago', '--grep=revert', '-i', '--pretty=format:%H %s'], { cwd: rootDir, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
   } catch (e) {
     return gitCacheSet(_gitRollbackCache, key, null)
   }
   const rollbacks = []
-  const p = String(prefix || '').replace(/\/+$/, '')
+  // [本地定制] 前缀反推(同 gitCoChange)
+  const p = gitPrefixFor(rootDir, prefix).replace(/\/+$/, '')
   for (const line of out.split('\n')) {
     const t = line.trim()
     if (!t) continue
@@ -122,8 +179,43 @@ export async function gitRollbacks(rootDir, prefix, sinceDays = 30) {
 }
 
 // ---------- 文件 spool 服务 ----------
+// [本地定制 2026-11-12] 单实例锁。桌面端会在 DSH 启动/新会话时自动拉起 helper
+// (见 nle-plugin/dsnle-agent-mount.mjs);DSH 重启后旧 helper 往往还活着,
+// 若不加锁就会叠出第二份 ~1.2GB 的模型进程。锁在加载模型**之前**判定,
+// 所以重复拉起只花几十毫秒就退出。pid 失活(重启/崩溃)则视为陈旧锁并接管。
+function takeSpoolLock(spoolDir) {
+  const lockFile = join(spoolDir, 'server.pid')
+  try {
+    if (existsSync(lockFile)) {
+      const pid = Number(String(readFileSync(lockFile, 'utf8')).trim())
+      if (pid && pid !== process.pid) {
+        let alive = false
+        try { process.kill(pid, 0); alive = true } catch { alive = false }
+        if (alive) {
+          console.error(`[nle-semantic] another helper is already running (pid ${pid}); exiting`)
+          return false
+        }
+        console.error(`[nle-semantic] stale lock (pid ${pid}); taking over`)
+      }
+    }
+  } catch { /* unreadable lock: overwrite */ }
+  try { writeFileSync(lockFile, String(process.pid)) } catch { /* best effort */ }
+  const drop = () => {
+    try {
+      const pid = Number(String(readFileSync(lockFile, 'utf8')).trim())
+      if (pid === process.pid) rmSync(lockFile, { force: true })
+    } catch { /* ignore */ }
+  }
+  process.on('exit', drop)
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGBREAK']) {
+    try { process.on(sig, () => { drop(); process.exit(0) }) } catch { /* platform */ }
+  }
+  return true
+}
+
 export async function serveSpool(spoolDir = DEFAULT_SPOOL, { pollMs = 200 } = {}) {
   mkdirSync(spoolDir, { recursive: true })
+  if (!takeSpoolLock(spoolDir)) return
   console.log(`[nle-semantic] spool watching: ${spoolDir}`)
   await initEmbedder()
   console.log('[nle-semantic] model ready')
@@ -201,4 +293,6 @@ if (process.argv[1] && process.argv[1].endsWith('server.mjs')) {
     process.exit(0)
   }
   await serveSpool(flag('--spool') || DEFAULT_SPOOL)
+  // 单实例锁判定为「已有 helper」时不进循环,这里显式以 0 退出,避免上层误报失败
+  process.exit(0)
 }
