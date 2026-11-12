@@ -1,5 +1,11 @@
 # dsh-cognition bundle patch — 让 `dsh plugin add` 可以安装 DSNLE
-# 插件入口:本仓库 nle-plugin/dsnle-plugin.mjs(常规 ESM,规则源 import 自仓库根 nle-rules-core.mjs)
+#
+# [本地修改 2026-11-12] 只挂 agent 侧的挂载器,不再挂插件本体:
+#   插件本体依赖 fs / tools 两个 **agent 作用域** 服务;挂在 profile 层时
+#   `ctx.get('fs')` 为 undefined,apply 静默 early-return,整张 nle_* 工具表不注册
+#   (实测见 ~/.dsh/logs/nle-apply.log)。挂载器监听 agent/created 后再把插件挂进
+#   agent 的 ctx,效果等价于作者的 preset 安装方式。
+#   如果你改用 preset 方式安装,preset 里直接写 dsnle-plugin.mjs 即可,不需要本文件。
 - insert:
-    - id: dsnle
-      name: ./nle-plugin/dsnle-plugin.mjs
+    - id: dsnle-agent-mount
+      name: ./nle-plugin/dsnle-agent-mount.mjs
