@@ -3,6 +3,14 @@
 //   - id: dsnle
 //     name: <绝对路径>/nle-plugin/dsnle-plugin.mjs
 // 与动态版(cordis_define 形态)共享 apply 函数体与规则源;规则经 import 单一源。
+// [本地诊断 2026-11-12] 装载自检:apply 是否进入、agent 作用域服务是否可见、工具注册是否被跳过。
+// 写 ~/.dsh/logs/nle-apply.log(不进工作区)。背景:profile 层挂载时 fs/tools 不可见,
+// 本插件会静默不装载 —— 没有这行日志就只能看到「装了但没有 nle_* 工具」。
+import { appendFileSync, mkdirSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join as nleJoin, dirname as nleDirname } from 'node:path'
+const NLE_LOG = nleJoin(process.env.DSH_HOME || nleJoin(homedir(), '.dsh'), 'logs', 'nle-apply.log')
+const NLE_DIAG = (o) => { try { mkdirSync(nleDirname(NLE_LOG), { recursive: true }); appendFileSync(NLE_LOG, new Date().toISOString() + ' ' + JSON.stringify(o) + '\n') } catch {} }
 import {
   fnv1a,
   classifyTier,
@@ -71,7 +79,7 @@ import {
   PROMOTE_CONFIDENCE,
 } from '../nle-rules-core.mjs'
 
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 
 // P7-C:learned 状态技能文件落盘(仅持久形态)——动态形态无宿主 fs,apply 内 typeof 检查降级
@@ -87,7 +95,11 @@ export function apply(ctx) {
     const fs = ctx.get('fs')
     const sandboxPolicy = ctx.get('sandboxPolicy')
     const systemPrompt = ctx.get('systemPrompt')
-    if (fs === undefined) return
+    let diagTools = 'n/a', diagInitiator = 'n/a'
+    try { diagTools = typeof ctx.get('tools') } catch (e) { diagTools = 'ERR:' + e.message }
+    try { const ag = ctx.get('agents'); diagInitiator = ag ? (typeof ag.currentInitiator === 'function' ? String(!!ag.currentInitiator()) : 'no-currentInitiator') : 'no-agents' } catch (e) { diagInitiator = 'ERR:' + e.message }
+    NLE_DIAG({ phase: 'apply-enter', fs: typeof fs, sandboxPolicy: typeof sandboxPolicy, systemPrompt: typeof systemPrompt, tools: diagTools, initiator: diagInitiator })
+    if (fs === undefined) { NLE_DIAG({ phase: 'apply-early-return', reason: 'no fs service' }); return }
 
     // ---------- constants ----------
     const STATE_FILE = '.dsnle-state.json'
@@ -831,6 +843,7 @@ export function apply(ctx) {
       } catch (e) { /* 无 harness(持久形态)或沙箱拒绝 → shape */ }
       return shape
     }
+    let nleToolCount = 0
     function register(def) {
       const tool = defineTool(def)
       ctx.effect(() => {
@@ -841,7 +854,8 @@ export function apply(ctx) {
           if (agent && agent.ctx) target = agent.ctx
         } catch (e) { /* fallback */ }
         const tools = target.get('tools')
-        if (tools) return tools.register(tool)
+        if (tools) { nleToolCount++; return tools.register(tool) }
+        NLE_DIAG({ phase: 'register-skipped', tool: tool.name, reason: 'no tools service in scope' })
         try {
           if (typeof harness !== 'undefined' && harness && typeof harness.registerTool === 'function') {
             return harness.registerTool(target, tool)
@@ -1391,6 +1405,7 @@ export function apply(ctx) {
         return { ok: true, retired: n, file: rel }
       },
     })
+    NLE_DIAG({ phase: 'apply-ready', tools: nleToolCount, root: state.root })
 // ==== DSNLE fragment: apply-knowledge — skills provider + 语义/git spool 客户端 ====
     // P1:learned → DSH skills provider(nle-learned)——模型目录可见摘要,正文按需加载,零常驻 token 成本
     let invalidateSkills = null

@@ -8,9 +8,16 @@
 // 纯规则,零 import(保证可嵌入)。
 // ============================================================
 
-export const SOURCE_RE = /\.(?:js|mjs|cjs|jsx|ts|tsx|py)$/
+// ---------------------------------------------------------------------------
+// [本地定制 2026-11-12] 源码口径:上游只认 js/ts/py(其实验仓是 JS 项目),Unity
+// 工程里 Assets/ 下一个 js/ts/py 都没有 → NLE 看不到任何源码。这里把源码扩展名
+// 与源码目录抽成一处,补 C#/ShaderLab/HLSL。要再加(如 uxml/uss),只改这两行。
+export const SOURCE_EXTS = 'js|mjs|cjs|jsx|ts|tsx|py|cs|shader|hlsl'
+export const SOURCE_DIRS = 'src|lib|handlers|scene|nle|Assets|Runtime|Game|Scripts'
+// ---------------------------------------------------------------------------
+export const SOURCE_RE = new RegExp('\\.(?:' + SOURCE_EXTS + ')$', 'i')
 export const SHELL_WRITE_RE = /(?:^|[;&|(]\s*)(?:Set-Content|Add-Content|Out-File|Remove-Item|Move-Item|New-Item|sed\s+-i|tee)\b|\b(?:node\s+-e|python\s+-c)\b|>>|>\s*\S+\.\w+|\b(?:rm|del|mv|cp)\s+(?:-[\w]+\s+)?[^\s;&|]+|\bcopy\s+[^\s;&|]+/
-export const SOURCE_PATH_RE = /(?:^|[\\/])(?:src|lib|handlers|scene|nle)[\\/][\w.\-]+\.(?:js|mjs|cjs|jsx|ts|tsx|py)|\.dsnle-state\.json/
+export const SOURCE_PATH_RE = new RegExp('[\\w.\\-]+\\.(?:' + SOURCE_EXTS + ')\\b|\\.dsnle-state\\.json', 'i')
 export const HIGH_IMPACT = ['src/store.js', 'src/store-backup.js', 'src/index.js', 'src/slices/', 'nle/']
 
 // 观测/检索参数(插件与离线工具共用)
@@ -20,7 +27,10 @@ export const SCAN_MAX_BYTES = 1000000
 // V5.3:检索扫描上限(真实项目 moment 766 文件,200 截断漏检深层目标)
 export const SCAN_CAP = 2000
 // V5.3:非业务目录(构建产物/工具脚本,真实项目降噪)
-export const SCAN_SKIP_DIRS = ['node_modules', '.git', '.nle', 'dist', 'min', 'benchmarks', 'tasks', 'scripts', 'templates', 'docs', 'examples', 'typing-tests', 'ts3.1-typings', 'ts3.1-typing-tests', 'meteor', '.github']
+// [本地定制 2026-11-12] 追加 Unity/编辑器产物目录,否则扫描会一头栽进 Library/、
+// .nuget/ 这类上万目录的树里(作者扫描器每轮只走 120 个目录,预算会被瞬间吃光)。
+export const SCAN_SKIP_DIRS = ['node_modules', '.git', '.nle', 'dist', 'min', 'benchmarks', 'tasks', 'scripts', 'templates', 'docs', 'examples', 'typing-tests', 'ts3.1-typings', 'ts3.1-typing-tests', 'meteor', '.github',
+  'Library', 'Temp', 'Obj', 'obj', 'Logs', 'UserSettings', 'PackageCache', 'Build', 'Builds', 'build', 'build_android', 'StreamingAssets', 'TextMesh Pro', 'MemoryCaptures', 'Recordings', 'TestResults', 'LocalPacks', 'Tools', '.vs', '.idea', '.nuget', '.dotnet-home', '.dsh', '.nle-semantic']
 // V5.3:建议候选窗(6 → 10,真实项目深层目标可进窗)
 export const SUGGEST_TOP_N = 10
 
@@ -64,7 +74,7 @@ export function fnv1a(str) {
 }
 
 export function classifyTier(task) {
-  if (/([\\/][\w.\-]+\.(?:js|ts|jsx|tsx|py|mjs))/.test(task)) return 'T1'
+  if (new RegExp('([\\\\/][\\w.\\-]+\\.(?:' + SOURCE_EXTS + '))').test(task)) return 'T1'
   if (/(重构|refactor|跨模块|跨域|核心|runtime|性能|perf|store|slices|guard|mcp-server|nle\/src)/i.test(task)) return 'T3'
   return 'T2'
 }
@@ -633,7 +643,7 @@ export function createRetrieve(io) {
     for (const f of aliasFiles) add(f, 5)
     for (const f of learnedFiles) add(f, 6)
     for (const f of scanned) {
-      const base = f.split('/').pop().replace(/\.(?:js|mjs|jsx|ts|tsx|py)$/i, '').toLowerCase()
+      const base = f.split('/').pop().replace(SOURCE_RE, '').toLowerCase()
       for (const t of tokens) {
         if (base.includes(t)) add(f, 3)
         else if (f.toLowerCase().includes(t)) add(f, 1)
@@ -798,14 +808,14 @@ export function normalizeSpec(spec, fromRel) {
 // cells: { rel: { surfaceImports: string[] } }
 // 返回 [{ file, via }];目录 import('./utils' → utils/index.js)双向匹配。
 export function exactImporters(cells, targetRel) {
-  const t = String(targetRel).replace(/\.(?:js|mjs|cjs|jsx|ts|tsx|py)$/i, '')
+  const t = String(targetRel).replace(SOURCE_RE, '')
   const out = []
   for (const [f, cell] of Object.entries(cells || {})) {
     if (f === targetRel) continue
     for (const spec of cell.surfaceImports || []) {
       const n = normalizeSpec(spec, f)
       if (n === null) continue
-      const base = n.replace(/\.(?:js|mjs|cjs|jsx|ts|tsx|py)$/i, '')
+      const base = n.replace(SOURCE_RE, '')
       if (base === t || base + '/index' === t || base === t + '/index') {
         out.push({ file: f, via: spec })
         break
